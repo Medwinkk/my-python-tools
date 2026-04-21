@@ -1,25 +1,41 @@
 import streamlit as st
 from PIL import Image
 import io
+import zipfile
 
-st.title("Pro Image Optimizer")
-st.write("Metadata stripping + Color Quantization (JPEG Mini style)")
+st.title("Batch Pro Optimizer")
+st.write("Drag multiple files to strip metadata and optimize colors.")
 
-uploaded_file = st.file_uploader("Upload image (JPG, PNG, TIFF)", type=["jpg", "jpeg", "png", "tif", "tiff"])
+files = st.file_uploader("Upload Images", type=["jpg", "jpeg", "png", "tif", "tiff"], accept_multiple_files=True)
 
-if uploaded_file:
-    original_img = Image.open(uploaded_file).convert("RGB")
+if files:
+    zip_buffer = io.BytesIO()
+    total_old_size = 0
+    total_new_size = 0
+
+    with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED) as zip_file:
+        for file in files:
+            img = Image.open(file).convert("RGB")
+            
+            # Pro Optimization logic
+            optimized_img = img.quantize(colors=256, method=2).convert("RGB")
+            
+            buf = io.BytesIO()
+            optimized_img.save(buf, format="JPEG", optimize=True, quality=80, subsampling=0)
+            
+            # Statistics
+            total_old_size += file.size
+            total_new_size += buf.getbuffer().nbytes
+            
+            # Add to ZIP
+            zip_file.writestr(f"opt_{file.name.split('.')[0]}.jpg", buf.getvalue())
+
+    reduction = 100 - (total_new_size / total_old_size * 100)
+    st.metric("Total Space Saved", f"{total_new_size/1024/1024:.2f} MB", f"-{reduction:.1f}%")
     
-    # Reducem culorile (Quantization) pentru a optimiza spatiul
-    optimized_img = original_img.quantize(colors=256, method=2).convert("RGB")
-    
-    buffer = io.BytesIO()
-    # Salvam fara metadata (EXIF) si cu optimizare Huffman
-    optimized_img.save(buffer, format="JPEG", optimize=True, quality=80, subsampling=0)
-    
-    st.subheader("Results")
-    reduction = 100 - (buffer.getbuffer().nbytes / uploaded_file.size * 100)
-    st.metric("New Size", f"{buffer.getbuffer().nbytes / 1024:.2f} KB", f"-{reduction:.1f}%")
-    st.info("Privacy Shield: All EXIF/GPS metadata has been removed.")
-    
-    st.download_button(label="Download Optimized Image", data=buffer.getvalue(), file_name="optimized.jpg", mime="image/jpeg")
+    st.download_button(
+        label=f"Download {len(files)} Optimized Files (ZIP)",
+        data=zip_buffer.getvalue(),
+        file_name="optimized_batch.zip",
+        mime="application/zip"
+    )
