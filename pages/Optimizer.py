@@ -3,10 +3,10 @@ from PIL import Image
 import io
 import zipfile
 
-st.title("Batch Pro Optimizer")
-st.write("Drag multiple files to strip metadata and optimize colors.")
+st.title("Premium JPEG Optimizer")
+st.write("High-Fidelity Optimization: No Artifacts, No Metadata, Pure JPEG.")
 
-files = st.file_uploader("Upload Images", type=["jpg", "jpeg", "png", "tif", "tiff"], accept_multiple_files=True)
+files = st.file_uploader("Drag and drop images here", type=["jpg", "jpeg", "png", "tif", "tiff"], accept_multiple_files=True)
 
 if files:
     zip_buffer = io.BytesIO()
@@ -15,27 +15,47 @@ if files:
 
     with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED) as zip_file:
         for file in files:
+            # Deschiderea imaginii si conversia la RGB pentru compatibilitate maxima
             img = Image.open(file).convert("RGB")
             
-            # Pro Optimization logic
-            optimized_img = img.quantize(colors=256, method=2).convert("RGB")
+            # 1. Smart Sharpness: Daca imaginea e gigant, o scalam cu cel mai bun filtru (Lanczos)
+            max_size = 2560
+            if max(img.size) > max_size:
+                img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
             
             buf = io.BytesIO()
-            optimized_img.save(buf, format="JPEG", optimize=True, quality=80, subsampling=0)
             
-            # Statistics
+            # 2. Premium JPEG Settings:
+            # quality=85 -> Balansul perfect unde artefactele sunt invizibile ochiului
+            # subsampling=0 -> (4:4:4) Pastreaza culorile 100% clare (fara blur de compresie)
+            # optimize=True -> Calculeaza tabele Huffman personalizate pentru fiecare poza
+            img.save(
+                buf, 
+                format="JPEG", 
+                quality=85, 
+                subsampling=0, 
+                optimize=True
+            )
+            
             total_old_size += file.size
             total_new_size += buf.getbuffer().nbytes
             
-            # Add to ZIP
-            zip_file.writestr(f"opt_{file.name.split('.')[0]}.jpg", buf.getvalue())
+            # Adaugare in ZIP
+            file_name = f"optimized_{file.name.split('.')[0]}.jpg"
+            zip_file.writestr(file_name, buf.getvalue())
 
     reduction = 100 - (total_new_size / total_old_size * 100)
-    st.metric("Total Space Saved", f"{total_new_size/1024/1024:.2f} MB", f"-{reduction:.1f}%")
+    
+    st.subheader("Optimization Results")
+    col1, col2 = st.columns(2)
+    col1.metric("Initial Total", f"{total_old_size/1024/1024:.2f} MB")
+    col2.metric("Final JPEG", f"{total_new_size/1024/1024:.2f} MB", f"-{reduction:.1f}%")
+    
+    st.success("Clean: All metadata (GPS, Camera info) has been stripped.")
     
     st.download_button(
-        label=f"Download {len(files)} Optimized Files (ZIP)",
+        label=f"Download {len(files)} Optimized JPEGs (ZIP)",
         data=zip_buffer.getvalue(),
-        file_name="optimized_batch.zip",
+        file_name="optimized_jpegs.zip",
         mime="application/zip"
     )
