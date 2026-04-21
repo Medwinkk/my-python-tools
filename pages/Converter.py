@@ -1,14 +1,27 @@
 import streamlit as st
 from PIL import Image
 import io
+import zipfile
 
-st.title("TIFF to JPEG Converter")
-uploaded_file = st.file_uploader("Upload a TIFF image", type=["tif", "tiff"])
+st.title("Batch TIFF to JPEG")
 
-if uploaded_file:
-    image = Image.open(uploaded_file)
-    rgb_image = image.convert("RGB")
-    buffer = io.BytesIO()
-    rgb_image.save(buffer, format="JPEG", quality=95)
-    st.image(image, caption="Original Image Preview")
-    st.download_button(label="Download JPEG", data=buffer.getvalue(), file_name="converted.jpg", mime="image/jpeg")
+files = st.file_uploader("Drag and drop TIFF images here", type=["tif", "tiff"], accept_multiple_files=True)
+
+if files:
+    zip_buffer = io.BytesIO()
+    
+    with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED) as zip_file:
+        for file in files:
+            img = Image.open(file).convert("RGB")
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=95)
+            # Add to ZIP
+            zip_file.writestr(f"{file.name.split('.')[0]}.jpg", buf.getvalue())
+            
+    st.success(f"Processed {len(files)} files.")
+    st.download_button(
+        label="Download All as ZIP",
+        data=zip_buffer.getvalue(),
+        file_name="converted_images.zip",
+        mime="application/zip"
+    )
